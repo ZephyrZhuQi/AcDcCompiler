@@ -4,6 +4,9 @@
 #include <string.h>
 #include "header.h"
 
+Token IDs[23];//added by zhuqi
+int no = 0;//added by zhuqi
+
 int main( int argc, char *argv[] )
 {
     FILE *source, *target;
@@ -27,7 +30,6 @@ int main( int argc, char *argv[] )
             symtab = build(program);
             check(&program, &symtab);
             gencode(program, target);
-            //test_parser(source);
         }
     }
     else{
@@ -110,6 +112,15 @@ Token scanner( FILE *source )
                 ungetc(c, source);
                 token.tok[i] = '\0';
                 token.type = Alphabet;
+                for(i=0;i<23;i++){
+                    if( strcmp(token.tok, IDs[i].tok)==0 ){
+                        printf("exist in IDs: %s\n", token.tok);
+                        return token;
+                    } 
+                }
+                IDs[no] = token;
+                printf("add to IDs: %s\n", token.tok);
+                no++;
                 return token;
             }
             return token;
@@ -175,6 +186,7 @@ Declarations *parseDeclarations( FILE *source )
     Token token = scanner(source);
     Declaration decl;
     Declarations *decls;
+    int i = 0, j;
     switch(token.type){
         case FloatDeclaration:
         case IntegerDeclaration:
@@ -183,7 +195,11 @@ Declarations *parseDeclarations( FILE *source )
             return makeDeclarationTree( decl, decls );
         case PrintOp:
         case Alphabet:
-            ungetc(token.tok[0], source);
+            //ungetc(token.tok[0], source);//not enough, the token now has long length variable name.
+            while(token.tok[i++] != '\0');
+            for(j=i-2;j>-1;j--){
+                ungetc(token.tok[j], source);
+            }
             return NULL;
         case EOFsymbol:
             return NULL;
@@ -199,12 +215,19 @@ Expression *parseValue( FILE *source )//這邊要做常數折疊
     Token next_token = scanner(source);//判斷是否是MulNode or DivNode
     Expression *value = (Expression *)malloc( sizeof(Expression) );
     Expression *expr;
+    int i=0, j;
     value->leftOperand = value->rightOperand = NULL;
 
     switch(token.type){
         case Alphabet:
             (value->v).type = Identifier;
-            (value->v).val.id = token.tok[0];
+            for(int i=0;i<23;i++){
+                if( strcmp(IDs[i].tok, token.tok) == 0 ){
+                    (value->v).val.id = 'a'+ i;
+                    break;
+                }
+            }
+            //(value->v).val.id = token.tok[0];
             break;
         case IntValue:
             (value->v).type = IntConst;
@@ -237,7 +260,12 @@ Expression *parseValue( FILE *source )//這邊要做常數折疊
     }
 
     else{
-        ungetc(next_token.tok[0],source);
+        //ungetc(next_token.tok[0],source);//hidden trouble
+        while(token.tok[i++] != '\0');
+        for(j=i-2;j>-1;j--){
+            ungetc(token.tok[j], source);
+        }
+        printf("parsevalue: %d\n",(value->v).type);
         return value;
     }   
 }
@@ -246,7 +274,7 @@ Expression *parseExpressionTail( FILE *source, Expression *lvalue )
 {
     Token token = scanner(source);
     Expression *expr;
-
+    int i=0, j;
     switch(token.type){
         case PlusOp:
             expr = (Expression *)malloc( sizeof(Expression) );
@@ -264,12 +292,16 @@ Expression *parseExpressionTail( FILE *source, Expression *lvalue )
             return parseExpressionTail(source, expr);
         case Alphabet:
         case PrintOp:
-            ungetc(token.tok[0], source);
+            //ungetc(token.tok[0], source);
+            while(token.tok[i++] != '\0');
+            for(j=i-2;j>-1;j--){
+                ungetc(token.tok[j], source);
+            }
             return lvalue;
         case EOFsymbol:
             return lvalue;
         default:
-            printf("Syntax Error: Expect a numeric value or an identifier %s\n", token.tok);
+            printf("Tail Syntax Error: Expect a numeric value or an identifier %s\n", token.tok);
             exit(1);
     }
 }
@@ -278,7 +310,7 @@ Expression *parseExpression( FILE *source, Expression *lvalue )
 {
     Token token = scanner(source);
     Expression *expr;
-
+    int i=0, j;
     switch(token.type){
         case PlusOp:
             expr = (Expression *)malloc( sizeof(Expression) );
@@ -296,7 +328,11 @@ Expression *parseExpression( FILE *source, Expression *lvalue )
             return parseExpressionTail(source, expr);
         case Alphabet:
         case PrintOp:
-            ungetc(token.tok[0], source);
+            //ungetc(token.tok[0], source);
+            while(token.tok[i++] != '\0');
+            for(j=i-2;j>-1;j--){
+                ungetc(token.tok[j], source);
+            }
             return NULL;
         case EOFsymbol:
             return NULL;
@@ -317,7 +353,12 @@ Statement parseStatement( FILE *source, Token token )//need change
             if(next_token.type == AssignmentOp){
                 value = parseValue(source); 
                 expr = parseExpression(source, value);
-                return makeAssignmentNode(token.tok[0], value, expr);
+                for(int i=0;i<23;i++){
+                    if( strcmp(IDs[i].tok, token.tok) == 0 ){
+                        return makeAssignmentNode('a'+ i, value, expr);
+                    }
+                }
+                //return makeAssignmentNode(token.tok[0], value, expr);
             }
             else{
                 printf("Syntax Error: Expect an assignment op %s\n", next_token.tok);
@@ -325,8 +366,14 @@ Statement parseStatement( FILE *source, Token token )//need change
             }
         case PrintOp:
             next_token = scanner(source);
-            if(next_token.type == Alphabet)
-                return makePrintNode(next_token.tok[0]);
+            if(next_token.type == Alphabet){
+                for(int i=0;i<23;i++){
+                    if( strcmp(IDs[i].tok, next_token.tok) == 0 ){
+                        return makePrintNode('a'+ i);
+                    }
+                }
+            }
+                //return makePrintNode(next_token.tok[0]);
             else{
                 printf("Syntax Error: Expect an identifier %s\n", next_token.tok);
                 exit(1);
@@ -377,7 +424,13 @@ Declaration makeDeclarationNode( Token declare_type, Token identifier )
         default:
             break;
     }
-    tree_node.name = identifier.tok[0];
+    for(int i=0;i<23;i++){
+        if( strcmp(IDs[i].tok, identifier.tok) == 0){
+            tree_node.name = 'a' + i;
+            break;
+        }
+    }
+    //tree_node.name = identifier.tok[0];
     return tree_node;
 }
 

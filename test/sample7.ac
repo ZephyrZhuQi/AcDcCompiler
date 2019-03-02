@@ -1,7 +1,8 @@
-i ba
-i bc
-ba = 2
-bc = 5
-bc = bc * ba
-p ba
-p bc
+i abcdefg
+i hijklmn
+abcdefg = 2
+hijklmn = 5
+abcdefg = abcdefg - hijklmn
+p abcdefg
+
+
