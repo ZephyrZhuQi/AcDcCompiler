@@ -1,0 +1,7 @@
+i ba
+i bc
+ba = 2
+bc = 5
+bc = bc * ba
+p ba
+p bc
