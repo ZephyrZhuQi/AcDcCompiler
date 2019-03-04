@@ -1,8 +1,12 @@
-i abcdefg
-i hijklmn
-abcdefg = 2
-hijklmn = 5
-abcdefg = abcdefg - hijklmn
-p abcdefg
+i leftoperand
+i rightoperand
+i sum
+f presult
+leftoperand = 25
+rightoperand = 5
+sum = leftoperand + rightoperand
+presult = 1+2 +leftoperand * rightoperand + 8 * 2.5 * 2 * 4
+p sum
+p presult
 
 

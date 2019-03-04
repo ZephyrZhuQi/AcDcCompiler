@@ -2,20 +2,28 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <math.h>
 #include "header.h"
+#define MAX_STACK_SIZE 100//used for stack
 
 Token IDs[23];//added by zhuqi
 int no = 0;//added by zhuqi
 
+int stack[MAX_STACK_SIZE];//used for stack
+float stack_float[MAX_STACK_SIZE];//used for float stack
+int top=-1;//used for stack
+int top_float=-1;//used for float stack
+
 int main( int argc, char *argv[] )
 {
-    FILE *source, *target;
+    FILE *source, *target, *test;
     Program program;
     SymbolTable symtab;
 
     if( argc == 3){
         source = fopen(argv[1], "r");
         target = fopen(argv[2], "w");
+        test = fopen(argv[3],"w");
         if( !source ){
             printf("can't open the source file\n");
             exit(2);
@@ -40,6 +48,64 @@ int main( int argc, char *argv[] )
     return 0;
 }
 
+/********************************************* 
+  Stack Operation 
+ *********************************************/
+void init_stack(){
+    top=-1;
+}
+
+void push(int data)
+{
+    if(top >= MAX_STACK_SIZE-1){
+        printf("stack over flow!\n");
+    }
+    else{
+        top++;
+        stack[top]=data;
+    }
+}
+
+int pop()
+{
+    int data;
+    if(top <=-1){
+        printf("stack under flow!\n");
+    }
+    else{
+        data = stack[top];
+        top--;
+        return data;
+    }
+}
+
+void init_stack_float(){
+    top_float=-1;
+}
+
+void push_float(float data)
+{
+    if(top_float >= MAX_STACK_SIZE-1){
+        printf("stack float over flow!\n");
+    }
+    else{
+        top_float++;
+        stack_float[top_float]=data;
+    }
+}
+
+float pop_float()
+{
+    float data;
+    if(top_float <= -1){
+        printf("stack float under flow!\n");
+    }
+    else{
+        data = stack_float[top_float];
+        top_float--;
+        return data;
+    }
+}
 
 /********************************************* 
   Scanning 
@@ -96,33 +162,37 @@ Token scanner( FILE *source )
         
         token.tok[0] = c;//變量名只有一個字母，這邊需要修改
         token.tok[1] = '\0';
+
         if( islower(c) ){
-            if( c == 'f' )
-                token.type = FloatDeclaration;
-            else if( c == 'i' )
-                token.type = IntegerDeclaration;
-            else if( c == 'p' )
-                token.type = PrintOp;
-            else{////變量名只有一個字母，這邊需要修改
-                int i = 0;
-                while( islower(c) ){
-                    token.tok[i++] = c;
-                    c = fgetc(source);
-                }
-                ungetc(c, source);
-                token.tok[i] = '\0';
-                token.type = Alphabet;
-                for(i=0;i<23;i++){
-                    if( strcmp(token.tok, IDs[i].tok)==0 ){
-                        printf("exist in IDs: %s\n", token.tok);
-                        return token;
-                    } 
-                }
-                IDs[no] = token;
-                printf("add to IDs: %s\n", token.tok);
-                no++;
-                return token;
+            int i = 0;
+            while( islower(c) ){
+                token.tok[i++] = c;
+                c = fgetc(source);
             }
+            ungetc(c, source);
+            token.tok[i] = '\0';
+            if( i == 1){
+                if( strcmp(token.tok, "f") == 0){
+                    token.type = FloatDeclaration;
+                    return token;
+                }
+                else if( strcmp(token.tok, "i") == 0){
+                    token.type = IntegerDeclaration;
+                    return token;
+                }
+                else if( strcmp(token.tok, "p") == 0){
+                    token.type = PrintOp;
+                    return token;
+                }
+            }
+            token.type = Alphabet;
+            for(i=0;i<23;i++){
+                if( strcmp(token.tok, IDs[i].tok)==0 ){
+                    return token;
+                } 
+            }
+            IDs[no] = token;
+            no++;
             return token;
         }
 
@@ -247,7 +317,7 @@ Expression *parseValue( FILE *source )//這邊要做常數折疊
         (expr->v).type = MulNode;
         (expr->v).val.op = Mul;
         expr->leftOperand = value;
-        expr->rightOperand = parseValue(source);
+        expr->rightOperand = parseValue(source);  
         return expr;
     }
     else if(next_token.type == DivOp){
@@ -261,11 +331,10 @@ Expression *parseValue( FILE *source )//這邊要做常數折疊
 
     else{
         //ungetc(next_token.tok[0],source);//hidden trouble
-        while(token.tok[i++] != '\0');
+        while(next_token.tok[i++] != '\0');
         for(j=i-2;j>-1;j--){
-            ungetc(token.tok[j], source);
+            ungetc(next_token.tok[j], source);
         }
-        printf("parsevalue: %d\n",(value->v).type);
         return value;
     }   
 }
@@ -532,7 +601,7 @@ SymbolTable build( Program program )
   Type checking
  *********************************************************************/
 
-void convertType( Expression * old, DataType type )
+void convertType( Expression * old, DataType type )//attention!這裏插入了一個類型轉換節點
 {
     if(old->type == Float && type == Int){
         printf("error : can't convert float to integer\n");
@@ -544,7 +613,7 @@ void convertType( Expression * old, DataType type )
             printf("convert to float %c \n",old->v.val.id);
         else
             printf("convert to float %d \n", old->v.val.ivalue);
-        tmp->v = old->v;
+        /*tmp->v = old->v;
         tmp->leftOperand = old->leftOperand;
         tmp->rightOperand = old->rightOperand;
         tmp->type = old->type;
@@ -555,7 +624,7 @@ void convertType( Expression * old, DataType type )
         old->v = v;
         old->type = Int;
         old->leftOperand = tmp;
-        old->rightOperand = NULL;
+        old->rightOperand = NULL;*/
     }
 }
 
@@ -668,9 +737,133 @@ void fprint_op( FILE *target, ValueType op )
     }
 }
 
-void fprint_expr( FILE *target, Expression *expr)
+void constant_op( ValueType op, int mode)//print to a char*/string
+{
+    if(mode == 1){
+        int right_operand=pop();
+        int left_operand=pop();
+        int result;
+        switch(op){
+            case MinusNode:
+                //fprintf(target,"-");
+                break;
+            case PlusNode:
+                //fprintf(target,"+");
+                break;
+            case MulNode://added by zhuqi
+                result = left_operand * right_operand;
+                push(result);
+                break;
+            case DivNode://added by zhuqi
+                result = left_operand / right_operand;
+                push(result);
+                break;
+            default:
+                printf("Error in fprintf_op ValueType = %d\n",op);
+                break;
+        }
+    }
+    else if(mode ==2){
+        float right_operand=pop_float();
+        float left_operand=pop_float();
+        float result;
+        switch(op){
+            case MinusNode:
+                //fprintf(target,"-");
+                break;
+            case PlusNode:
+                //fprintf(target,"+");
+                break;
+            case MulNode://added by zhuqi
+                result = left_operand * right_operand;
+                push_float(result);
+                break;
+            case DivNode://added by zhuqi
+                result = left_operand / right_operand;
+                push_float(result);
+                break;
+            default:
+                printf("Error in fprintf_op ValueType = %d\n",op);
+                break;
+        }
+    }
+}
+
+/*返回0表示不能進行常數折疊，返回1表示能進行int常數折疊,返回2表示能進行float常數折疊*/
+int check_constant( Expression *expr)
+{
+    if(  (expr->v).type == FloatConst )
+        return 2;
+    else if ( (expr->v).type == IntConst)
+        return 1;
+    else if(  (expr->leftOperand->v).type == FloatConst )
+    {
+        if( check_constant( expr->rightOperand))
+            return 2;
+        else
+            return 0;
+    }
+    else if( (expr->leftOperand->v).type == IntConst)
+    {
+        if( check_constant( expr->rightOperand))
+            return check_constant( expr->rightOperand);
+        else
+            return 0;
+    }
+    return 0;
+}
+
+void calculat_constant( Expression *expr, int mode)
 {
     if( (expr->v).type == MulNode || (expr->v).type == DivNode){//added by zhuqi
+        if(expr->leftOperand != NULL){
+            calculat_constant( expr->leftOperand, mode);
+        }
+        if( (expr->rightOperand->v).type == MulNode || (expr->rightOperand->v).type == DivNode){//連續的乘除
+            calculat_constant( expr->rightOperand->leftOperand, mode);
+            expr->rightOperand->leftOperand = NULL;
+            constant_op( (expr->v).type, mode);
+            calculat_constant( expr->rightOperand, mode);
+        }
+        else{
+            calculat_constant( expr->rightOperand, mode);
+            constant_op( (expr->v).type, mode);
+        }
+    }
+    else if(expr->leftOperand == NULL){
+        switch( (expr->v).type ){
+            case IntConst:
+                if(mode == 1)
+                    push( (expr->v).val.ivalue);
+                else if(mode == 2)
+                    push_float( (expr->v).val.ivalue);
+                break;
+            case FloatConst:
+                push_float( (expr->v).val.fvalue);
+                break;
+            default:
+                printf("Error In calculat_constant_expr. (expr->v).type=%d\n",(expr->v).type);
+                break;
+        }
+    }
+}
+
+void fprint_expr( FILE *target, Expression *expr)
+{
+    if( (expr->v).type == MulNode || (expr->v).type == DivNode ){//added by zhuqi
+        //constant folding
+        int check_result;
+        check_result = check_constant(expr);
+        if( check_result == 1){//常數串的乘除運算，折疊成int
+            calculat_constant( expr, 1);
+            fprintf(target, "%d\n", pop());
+            return;
+        }
+        if( check_result == 2){//常數串的乘除運算，折疊成float
+            calculat_constant( expr, 2);
+            fprintf(target, "%f\n", pop_float());
+            return;
+        }
         if(expr->leftOperand != NULL){
             fprint_expr(target, expr->leftOperand);
         }
@@ -707,7 +900,6 @@ void fprint_expr( FILE *target, Expression *expr)
             fprintf(target,"5k\n");
         }
         else{
-            //	fprint_right_expr(expr->rightOperand);
             fprint_expr(target, expr->rightOperand);
             fprint_op(target, (expr->v).type);
         }
@@ -755,6 +947,7 @@ void print_expr(Expression *expr)
         return;
     else{
         print_expr(expr->leftOperand);
+        printf("\nmiddle type: %d\n", (expr->v).type);
         switch((expr->v).type){
             case Identifier:
                 printf("%c ", (expr->v).val.id);
