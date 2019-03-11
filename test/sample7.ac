@@ -5,7 +5,7 @@ f presult
 leftoperand = 25
 rightoperand = 5
 sum = leftoperand + rightoperand
-presult = 1+2 +leftoperand * rightoperand + 8 * 2.5 * 2 * 4
+presult = 30.5 + 2 + 3 +leftoperand * rightoperand + 1.0/2 + 1 + 1 + 2
 p sum
 p presult
 
