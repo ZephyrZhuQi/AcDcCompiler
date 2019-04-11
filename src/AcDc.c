@@ -313,36 +313,16 @@ Declarations *parseDeclarations(FILE *source)
     }
 }
 
-Expression *constfold(FILE *source, Expression *lvalue) //constant folding for plus&minus
+Expression *constfoldtail(FILE *source, Expression *lvalue)
 {
     Token token = scanner(source);
     Token next_token = scanner(source);
     Expression *value = (Expression *)malloc(sizeof(Expression));
     value->leftOperand = value->rightOperand = NULL;
     int i = 0, j; //for feed back
-    if (token.type == IntValue || token.type == FloatValue)
-    {
-        switch (token.type)
-        {
-        case IntValue:
-            (value->v).type = IntConst;
-            (value->v).val.ivalue = atoi(token.tok);
-            break;
-        case FloatValue:
-            (value->v).type = FloatConst;
-            (value->v).val.fvalue = atof(token.tok);
-            break;
-        }
-        //feed back next_token...
-        i = 0;
-        while (next_token.tok[i++] != '\0')
-            ;
-        for (j = i - 2; j > -1; j--)
-            ungetc(next_token.tok[j], source);
-        return constfold(source, value);
-    }
-    else if ((token.type == MinusOp || token.type == PlusOp) &&
-             (next_token.type == IntValue || next_token.type == FloatValue))
+
+    if ((token.type == MinusOp || token.type == PlusOp) &&
+        (next_token.type == IntValue || next_token.type == FloatValue))
     {
         int result;
         float fresult;
@@ -362,7 +342,7 @@ Expression *constfold(FILE *source, Expression *lvalue) //constant folding for p
                     result = left + right;
                 (value->v).type = IntConst;
                 (value->v).val.ivalue = result;
-                return constfold(source, value);
+                return constfoldtail(source, value);
             }
             else if (next_token.type == FloatValue)
             {
@@ -373,7 +353,7 @@ Expression *constfold(FILE *source, Expression *lvalue) //constant folding for p
                     fresult = left + fright;
                 (value->v).type = FloatConst;
                 (value->v).val.fvalue = fresult;
-                return constfold(source, value);
+                return constfoldtail(source, value);
             }
         }
         else if ((lvalue->v).type == FloatConst)
@@ -388,7 +368,7 @@ Expression *constfold(FILE *source, Expression *lvalue) //constant folding for p
                     fresult = fleft + right;
                 (value->v).type = FloatConst;
                 (value->v).val.fvalue = fresult;
-                return constfold(source, value);
+                return constfoldtail(source, value);
             }
             else if (next_token.type == FloatValue)
             {
@@ -399,9 +379,70 @@ Expression *constfold(FILE *source, Expression *lvalue) //constant folding for p
                     fresult = fleft + fright;
                 (value->v).type = FloatConst;
                 (value->v).val.fvalue = fresult;
-                return constfold(source, value);
+                return constfoldtail(source, value);
             }
         }
+    }
+    else
+    { //feed back token and next_token...
+        i = 0;
+        while (next_token.tok[i++] != '\0')
+            ;
+        for (j = i - 2; j > -1; j--)
+            ungetc(next_token.tok[j], source);
+        ungetc(' ', source);
+        i = 0;
+        while (token.tok[i++] != '\0')
+            ;
+        for (j = i - 2; j > -1; j--)
+            ungetc(token.tok[j], source);
+        return lvalue;
+    }
+}
+
+Expression *constfold(FILE *source, Expression *lvalue) //constant folding for plus&minus
+{
+    Token token = scanner(source);
+    Token next_token = scanner(source);
+    Expression *value = (Expression *)malloc(sizeof(Expression));
+    value->leftOperand = value->rightOperand = NULL;
+    int i = 0, j; //for feed back
+    if (next_token.type != MinusOp || next_token.type != PlusOp)
+    {
+        //feed back token and next_token...
+        i = 0;
+        while (next_token.tok[i++] != '\0')
+            ;
+        for (j = i - 2; j > -1; j--)
+            ungetc(next_token.tok[j], source);
+        ungetc(' ', source);
+        i = 0;
+        while (token.tok[i++] != '\0')
+            ;
+        for (j = i - 2; j > -1; j--)
+            ungetc(token.tok[j], source);
+        return lvalue;
+    }
+    if (token.type == IntValue || token.type == FloatValue)
+    {
+        switch (token.type)
+        {
+        case IntValue:
+            (value->v).type = IntConst;
+            (value->v).val.ivalue = atoi(token.tok);
+            break;
+        case FloatValue:
+            (value->v).type = FloatConst;
+            (value->v).val.fvalue = atof(token.tok);
+            break;
+        }
+        //feed back next_token...
+        i = 0;
+        while (next_token.tok[i++] != '\0')
+            ;
+        for (j = i - 2; j > -1; j--)
+            ungetc(next_token.tok[j], source);
+        return constfoldtail(source, value);
     }
     else
     { //feed back token and next_token...
@@ -566,7 +607,7 @@ Expression *parseExpression(FILE *source, Expression *lvalue)
 Statement parseStatement(FILE *source, Token token) //need change
 {
     Token next_token;
-    Expression *constant,*value, *expr;
+    Expression *constant, *value, *expr;
 
     switch (token.type)
     {
@@ -574,8 +615,9 @@ Statement parseStatement(FILE *source, Token token) //need change
         next_token = scanner(source);
         if (next_token.type == AssignmentOp)
         {
-            constant=constfold(source,NULL);
-            if(constant==NULL){
+            constant = constfold(source, NULL);
+            if (constant == NULL)
+            {
                 value = parseValue(source);
                 expr = parseExpression(source, value);
                 for (int i = 0; i < 23; i++)
@@ -586,8 +628,9 @@ Statement parseStatement(FILE *source, Token token) //need change
                     }
                 }
             }
-            else{
-                expr=parseExpression(source, constant);
+            else
+            {
+                expr = parseExpression(source, constant);
                 for (int i = 0; i < 23; i++)
                 {
                     if (strcmp(IDs[i].tok, token.tok) == 0)
@@ -970,6 +1013,8 @@ int check_constant(Expression *expr)
         return 2;
     else if ((expr->v).type == IntConst)
         return 1;
+    else if((expr->v).type == Identifier)
+        return 0;
     else if ((expr->leftOperand->v).type == FloatConst)
     {
         if (check_constant(expr->rightOperand))
@@ -984,7 +1029,7 @@ int check_constant(Expression *expr)
         else
             return 0;
     }
-    return 0;
+    else{return 0;}
 }
 
 void calculat_constant(Expression *expr, int mode)
@@ -1028,6 +1073,47 @@ void calculat_constant(Expression *expr, int mode)
     }
 }
 
+void fprint_exprtail(FILE *target, Expression *expr)
+{
+    if ((expr->v).type == MulNode || (expr->v).type == DivNode)
+    {
+        if (expr->leftOperand != NULL)
+        {
+            fprint_exprtail(target, expr->leftOperand);
+        }
+        if ((expr->rightOperand->v).type == MulNode || (expr->rightOperand->v).type == DivNode)
+        { //連續的乘除
+            fprint_exprtail(target, expr->rightOperand->leftOperand);
+            expr->rightOperand->leftOperand = NULL;
+            fprint_op(target, (expr->v).type);
+            fprint_exprtail(target, expr->rightOperand);
+        }
+        else
+        {
+            fprint_exprtail(target, expr->rightOperand);
+            fprint_op(target, (expr->v).type);
+        }
+    }
+    else if(expr->leftOperand == NULL)
+    {
+        switch ((expr->v).type)
+        {
+        case Identifier:
+            fprintf(target, "l%c\n", (expr->v).val.id);
+            break;
+        case IntConst:
+            fprintf(target, "%d\n", (expr->v).val.ivalue);
+            break;
+        case FloatConst:
+            fprintf(target, "%f\n", (expr->v).val.fvalue);
+            break;
+        default:
+            fprintf(target, "Error In fprint_left_expr. (expr->v).type=%d\n", (expr->v).type);
+            break;
+        }
+    }
+}
+
 void fprint_expr(FILE *target, Expression *expr)
 {
     if ((expr->v).type == MulNode || (expr->v).type == DivNode)
@@ -1041,27 +1127,15 @@ void fprint_expr(FILE *target, Expression *expr)
             fprintf(target, "%d\n", pop());
             return;
         }
-        if (check_result == 2)
+        else if (check_result == 2)
         { //常數串的乘除運算，折疊成float
             calculat_constant(expr, 2);
             fprintf(target, "%f\n", pop_float());
             return;
         }
-        if (expr->leftOperand != NULL)
-        {
-            fprint_expr(target, expr->leftOperand);
-        }
-        if ((expr->rightOperand->v).type == MulNode || (expr->rightOperand->v).type == DivNode)
-        { //連續的乘除
-            fprint_expr(target, expr->rightOperand->leftOperand);
-            expr->rightOperand->leftOperand = NULL;
-            fprint_op(target, (expr->v).type);
-            fprint_expr(target, expr->rightOperand);
-        }
         else
         {
-            fprint_expr(target, expr->rightOperand);
-            fprint_op(target, (expr->v).type);
+            fprint_exprtail(target, expr);
         }
     }
     else if (expr->leftOperand == NULL)
