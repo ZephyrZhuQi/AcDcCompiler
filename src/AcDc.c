@@ -410,6 +410,7 @@ Expression *constfold(FILE *source, Expression *lvalue) //constant folding for p
             ;
         for (j = i - 2; j > -1; j--)
             ungetc(next_token.tok[j], source);
+        ungetc(' ', source);
         i = 0;
         while (token.tok[i++] != '\0')
             ;
